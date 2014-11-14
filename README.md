@@ -10,6 +10,7 @@ This plugin add Velocity language to Elasticsearch.
 | Version   | Elasticsearch |
 |:---------:|:-------------:|
 | master    | 1.4.X         |
+| 1.4.0     | 1.4.0         |
 
 ### Issues/Questions
 
@@ -19,8 +20,6 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 ## Installation
 
 ### Install Velocity Language Plugin
-
-TBD
 
     $ $ES_HOME/bin/plugin --install org.codelibs/elasticsearch-lang-velocity/1.4.0
 
@@ -41,9 +40,20 @@ Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-s
         }
     }
 
+If you use a template file, please put template_name.vm into ${es.confing}/scripts and send the following query:
+
+    GET /_search/template
+    {
+        "lang": "velocity",
+        "template": {"file":"template_name"},
+        "params": {
+            "query_string": "search for these words"
+        }
+    }
+
 ### Where is a root directory for Velocity's template
 
-The directory is ${es.conf}/scripts.
+The directory is ${es.config}/scripts.
 The file extension for Velocity's template is .vm or .velocity.
 
 ### Use Template Cache
