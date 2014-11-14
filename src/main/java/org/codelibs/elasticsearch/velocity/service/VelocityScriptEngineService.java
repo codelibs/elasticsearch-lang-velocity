@@ -18,6 +18,7 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.VelocityException;
+import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.component.AbstractComponent;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.UTF8StreamWriter;
@@ -102,6 +103,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         initPropertyValue(props,
                 "ES_TMPL.resource.loader.modificationCheckInterval", "60");
 
+        initPropertyValue(props, "velocimacro.library.autoreload", "false");
         initPropertyValue(props, "input.encoding", "UTF-8");
         initPropertyValue(props, "output.encoding", "UTF-8");
         initPropertyValue(props, "runtime.log", new File(env.logsFile(),
@@ -341,11 +343,11 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                 }
             }
 
+            BytesReference bytes = result.bytes();
             if (logger.isDebugEnabled()) {
-                logger.debug("output: {}", new String(result.bytes().array()));
+                logger.debug("output: {}", new String(bytes.array()));
             }
-
-            return result.bytes();
+            return bytes;
         }
 
         @Override
