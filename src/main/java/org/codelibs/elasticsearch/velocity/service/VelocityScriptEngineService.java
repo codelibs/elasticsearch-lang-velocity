@@ -5,14 +5,18 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.ref.SoftReference;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
+import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.VelocityException;
 import org.elasticsearch.common.component.AbstractComponent;
 import org.elasticsearch.common.inject.Inject;
@@ -37,9 +41,11 @@ public class VelocityScriptEngineService extends AbstractComponent implements
      */
     private static ThreadLocal<SoftReference<UTF8StreamWriter>> utf8StreamWriter = new ThreadLocal<>();
 
-    private VelocityEngine velocity;
+    private VelocityEngine velocityEngine;
 
     private File workDir;
+
+    private List<File> templateFileList = new LinkedList<File>();
 
     /**
      * If exists, reset and return, otherwise create, reset and return a writer.
@@ -72,23 +78,38 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                 .getByPrefix(VELOCITY_SCRIPT_PROPS).getAsMap().entrySet()) {
             props.put(entry.getKey(), entry.getValue());
         }
-        if (initPropertyValue(props, "resource.loader", "FILE")) {
-            initPropertyValue(props, "FILE.resource.loader.class",
-                    "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
-            initPropertyValue(props, "FILE.resource.loader.path",
-                    workDir.getAbsolutePath());
-            initPropertyValue(props, "FILE.resource.loader.cache", "true");
-            initPropertyValue(props,
-                    "FILE.resource.loader.modificationCheckInterval", "60");
+
+        final String resourceLoader = (String) props.get("resource.loader");
+        if (resourceLoader != null) {
+            props.put("resource.loader", "WORK_TMPL,ES_TMPL," + resourceLoader);
+        } else {
+            props.put("resource.loader", "WORK_TMPL,ES_TMPL");
         }
+
+        initPropertyValue(props, "WORK_TMPL.resource.loader.class",
+                "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
+        initPropertyValue(props, "WORK_TMPL.resource.loader.path",
+                workDir.getAbsolutePath());
+        initPropertyValue(props, "WORK_TMPL.resource.loader.cache", "true");
+        initPropertyValue(props,
+                "WORK_TMPL.resource.loader.modificationCheckInterval", "0");
+
+        initPropertyValue(props, "ES_TMPL.resource.loader.class",
+                "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
+        initPropertyValue(props, "ES_TMPL.resource.loader.path",
+                new File(env.configFile(), "scripts").getAbsolutePath());
+        initPropertyValue(props, "ES_TMPL.resource.loader.cache", "true");
+        initPropertyValue(props,
+                "ES_TMPL.resource.loader.modificationCheckInterval", "60");
+
         initPropertyValue(props, "input.encoding", "UTF-8");
         initPropertyValue(props, "output.encoding", "UTF-8");
         initPropertyValue(props, "runtime.log", new File(env.logsFile(),
                 "velocity.log").getAbsolutePath());
 
-        velocity = new VelocityEngine(props);
+        velocityEngine = new VelocityEngine(props);
 
-        velocity.init();
+        velocityEngine.init();
     }
 
     private boolean initPropertyValue(final Properties props, final String key,
@@ -117,39 +138,21 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
     @Override
     public Object compile(final String script) {
-        String encoding = (String) velocity.getProperty("input.encoding");
-        if (encoding == null) {
-            encoding = "UTF-8";
-        }
-
-        File templateFile = null;
-        BufferedWriter bw = null;
-        try {
-            templateFile = File.createTempFile("templ", ".vm", workDir);
-            bw = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream(templateFile), encoding));
-            bw.write(script);
-            bw.flush();
-        } catch (final IOException e) {
-            throw new VelocityException("Failed to create a template file.", e);
-        } finally {
-            if (bw != null) {
-                try {
-                    bw.close();
-                } catch (final IOException e) {
-                    // ignore
-                }
+        final VelocityScriptTemplate scriptTemplate = new VelocityScriptTemplate(
+                velocityEngine, workDir, script);
+        final File templateFile = scriptTemplate.getTemplateFile();
+        if (templateFile != null) {
+            synchronized (templateFileList) {
+                templateFileList.add(templateFile);
             }
         }
-
-        return new VelocityScriptContext(templateFile,
-                velocity.getTemplate(script));
+        return scriptTemplate;
     }
 
     @Override
     public ExecutableScript executable(final Object template,
             final Map<String, Object> vars) {
-        return new VelocityExecutableScript((VelocityScriptContext) template,
+        return new VelocityExecutableScript((VelocityScriptTemplate) template,
                 vars);
     }
 
@@ -165,7 +168,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         final UTF8StreamWriter writer = utf8StreamWriter().setOutput(result);
 
         try {
-            ((VelocityScriptContext) template).getTemplate().merge(
+            ((VelocityScriptTemplate) template).merge(
                     new VelocityContext(vars), writer);
             writer.flush();
         } catch (final IOException e) {
@@ -191,55 +194,123 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
     @Override
     public void scriptRemoved(final CompiledScript script) {
-        final File templateFile = ((VelocityScriptContext) script.compiled())
-                .getTemplateFile();
-        if (!templateFile.delete()) {
-            logger.warn("Failed to delete {}.", templateFile.getAbsolutePath());
+        final Object compiled = script.compiled();
+        if (compiled instanceof VelocityScriptTemplate) {
+            final File templateFile = ((VelocityScriptTemplate) compiled)
+                    .getTemplateFile();
+            if (templateFile != null) {
+                synchronized (templateFileList) {
+                    templateFileList.remove(templateFile);
+                }
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Deleting {}", templateFile.getAbsolutePath());
+                }
+                if (!templateFile.delete()) {
+                    logger.warn("Failed to delete {}.",
+                            templateFile.getAbsolutePath());
+                }
+            }
         }
     }
 
     @Override
     public void close() {
-        // Nothing to do here
+        synchronized (templateFileList) {
+            for (final File templateFile : templateFileList) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Deleting {}", templateFile.getAbsolutePath());
+                }
+                if (!templateFile.delete()) {
+                    logger.warn("Failed to delete {}.",
+                            templateFile.getAbsolutePath());
+                }
+            }
+        }
     }
 
-    private static class VelocityScriptContext {
+    public static class VelocityScriptTemplate {
         private Template template;
 
         private File templateFile;
 
-        public VelocityScriptContext(final File templateFile,
-                final Template template) {
-            this.templateFile = templateFile;
-            this.template = template;
-        }
+        private String script;
 
-        public Template getTemplate() {
-            return template;
+        private VelocityEngine velocityEngine;
+
+        public VelocityScriptTemplate(final VelocityEngine velocityEngine,
+                final File workDir, final String script) {
+            this.velocityEngine = velocityEngine;
+            if (script.startsWith("##cache")) {
+                String encoding = (String) velocityEngine
+                        .getProperty("input.encoding");
+                if (encoding == null) {
+                    encoding = "UTF-8";
+                }
+
+                templateFile = null;
+                BufferedWriter bw = null;
+                try {
+                    templateFile = File.createTempFile("templ", ".vm", workDir);
+                    bw = new BufferedWriter(new OutputStreamWriter(
+                            new FileOutputStream(templateFile), encoding));
+                    bw.write(script);
+                    bw.flush();
+                } catch (final IOException e) {
+                    throw new VelocityException(
+                            "Failed to create a template file.", e);
+                } finally {
+                    if (bw != null) {
+                        try {
+                            bw.close();
+                        } catch (final IOException e) {
+                            // ignore
+                        }
+                    }
+                }
+
+                template = velocityEngine.getTemplate(templateFile.getName());
+            } else {
+                this.script = script;
+            }
         }
 
         public File getTemplateFile() {
             return templateFile;
         }
+
+        public void merge(final Context context, final Writer writer) {
+            if (script != null) {
+                int length = script.length();
+                if (length > 10) {
+                    length = 10;
+                }
+                velocityEngine.evaluate(context, writer,
+                        script.substring(0, length), script);
+            } else {
+                template.merge(context, writer);
+            }
+        }
     }
 
     private class VelocityExecutableScript implements ExecutableScript {
         /** Compiled template object. */
-        private VelocityScriptContext context;
+        private VelocityScriptTemplate context;
 
         /** Parameters to fill above object with. */
         private Map<String, Object> vars;
 
         /**
-         * @param template
-         *            the compiled template object
-         * @param vars
-         *            the parameters to fill above object with
+         * @param template the compiled template object
+         * @param vars the parameters to fill above object with
          **/
-        public VelocityExecutableScript(final VelocityScriptContext context,
+        public VelocityExecutableScript(final VelocityScriptTemplate context,
                 final Map<String, Object> vars) {
             this.context = context;
-            this.vars = vars == null ? Collections.EMPTY_MAP : vars;
+            if (vars == null) {
+                this.vars = Collections.emptyMap();
+            } else {
+                this.vars = vars;
+            }
         }
 
         @Override
@@ -254,7 +325,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                     .setOutput(result);
 
             try {
-                context.getTemplate().merge(new VelocityContext(vars), writer);
+                context.merge(new VelocityContext(vars), writer);
                 writer.flush();
             } catch (final Exception e) {
                 logger.error(
@@ -269,6 +340,11 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                             e);
                 }
             }
+
+            if (logger.isDebugEnabled()) {
+                logger.debug("output: {}", new String(result.bytes().array()));
+            }
+
             return result.bytes();
         }
 

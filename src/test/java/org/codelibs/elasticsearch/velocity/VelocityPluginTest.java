@@ -35,8 +35,21 @@ public class VelocityPluginTest {
         final File scriptDir = new File(esHomeDir, "config/scripts");
         scriptDir.mkdirs();
         Files.write(
-                "\\{\"query\":\\{\"match\":\\{\"${my_field}\":\"${my_value}\"\\}\\},\"size\":\"${my_size}\"\\}"
+                "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}"
+                        .getBytes(), new File(scriptDir,
+                        "lib_search_query_1.vm"));
+        Files.write(
+                "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}"
                         .getBytes(), new File(scriptDir, "search_query_1.vm"));
+        Files.write(
+                "##cache\n{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}"
+                        .getBytes(), new File(scriptDir, "search_query_2.vm"));
+        Files.write("#parse(\"lib_search_query_1.vm\")".getBytes(), new File(
+                scriptDir, "search_query_3.vm"));
+        Files.write(
+                "#macro(macroSearchQuery){\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}#end"
+                        .getBytes(),
+                new File(scriptDir, "VM_global_library.vm"));
 
         runner = new ElasticsearchClusterRunner();
         runner.onBuild(new ElasticsearchClusterRunner.Builder() {
@@ -76,61 +89,149 @@ public class VelocityPluginTest {
             assertTrue(indexResponse.isCreated());
         }
 
-        String query;
-        query = "{\"query\":{\"match_all\":{}}}";
         try (CurlResponse curlResponse = Curl
-                .post(node, "/" + index + "/" + type + "/_search").body(query)
+                .post(node, "/_scripts/velocity/index_search_query_1")
+                .body("{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}")
                 .execute()) {
-            Map<String, Object> contentMap = curlResponse.getContentAsMap();
-            Map<String, Object> hitsMap = (Map<String, Object>) contentMap
-                    .get("hits");
-            assertThat(1000, is(hitsMap.get("total")));
-            assertThat(
-                    10,
-                    is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
+            assertThat(201, is(curlResponse.getHttpStatusCode()));
         }
 
-        query = "{\"template\":{\"query\":{\"match\":{\"{{my_field}}\":\"{{my_value}}\"}},\"size\":\"{{my_size}}\"},"
-                + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
-        try (CurlResponse curlResponse = Curl
-                .post(node, "/" + index + "/" + type + "/_search/template")
-                .body(query).execute()) {
-            Map<String, Object> contentMap = curlResponse.getContentAsMap();
-            Map<String, Object> hitsMap = (Map<String, Object>) contentMap
-                    .get("hits");
-            assertThat(100, is(hitsMap.get("total")));
-            assertThat(
-                    50,
-                    is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
-        }
+        for (int loop = 0; loop < 100; loop++) {
 
-        query = "{\"lang\":\"mustache\",\"template\":{\"query\":{\"match\":{\"{{my_field}}\":\"{{my_value}}\"}},\"size\":\"{{my_size}}\"},"
-                + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
-        try (CurlResponse curlResponse = Curl
-                .post(node, "/" + index + "/" + type + "/_search/template")
-                .body(query).execute()) {
-            Map<String, Object> contentMap = curlResponse.getContentAsMap();
-            Map<String, Object> hitsMap = (Map<String, Object>) contentMap
-                    .get("hits");
-            assertThat(100, is(hitsMap.get("total")));
-            assertThat(
-                    50,
-                    is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
-        }
+            String query;
+            query = "{\"query\":{\"match_all\":{}}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(1000, is(hitsMap.get("total")));
+                assertThat(10,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
 
-        query = "{\"lang\":\"velocity\",\"template\":{\"file\":\"search_query_1\"},"
-                + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
-        try (CurlResponse curlResponse = Curl
-                .post(node, "/" + index + "/" + type + "/_search/template")
-                .body(query).execute()) {
-            Map<String, Object> contentMap = curlResponse.getContentAsMap();
-            Map<String, Object> hitsMap = (Map<String, Object>) contentMap
-                    .get("hits");
-            assertThat(100, is(hitsMap.get("total")));
-            assertThat(
-                    50,
-                    is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
-        }
+            query = "{\"template\":{\"query\":{\"match\":{\"{{my_field}}\":\"{{my_value}}\"}},\"size\":\"{{my_size}}\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
 
+            query = "{\"lang\":\"mustache\",\"template\":{\"query\":{\"match\":{\"{{my_field}}\":\"{{my_value}}\"}},\"size\":\"{{my_size}}\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":\"#parse(\\\"lib_search_query_1.vm\\\")\","
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":{\"id\":\"index_search_query_1\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":{\"file\":\"search_query_1\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":{\"file\":\"search_query_2\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":{\"file\":\"search_query_3\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+
+            query = "{\"lang\":\"velocity\",\"template\":\"#macroSearchQuery\","
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = Curl
+                    .post(node, "/" + index + "/" + type + "/_search/template")
+                    .body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse
+                        .getContentAsMap();
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap
+                        .get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50,
+                        is(((List<Map<String, Object>>) hitsMap.get("hits"))
+                                .size()));
+            }
+        }
     }
 }
