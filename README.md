@@ -28,4 +28,24 @@ TBD
 
 This plugin supports an executable script language(search script is not supported).
 
-TBD
+### Using on Script-based Search Template
+
+Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-sstmpl "Script-based Search Template") Plugin, you can search by Velocity template.
+
+    GET /_search/template
+    {
+        "lang": "velocity",
+        "template": "{\"query\": {\"match\": {\"title\": \"${query_string}\"}}}",
+        "params": {
+            "query_string": "search for these words"
+        }
+    }
+
+### Where is a root directory for Velocity's template
+
+The directory is ${es.conf}/scripts.
+The file extension for Velocity's template is .vm or .velocity.
+
+### Use Template Cache
+
+To use a template cache for Velocity template, please prepend "##cache" to the template file.
