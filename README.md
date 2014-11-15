@@ -23,6 +23,14 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 
     $ $ES_HOME/bin/plugin --install org.codelibs/elasticsearch-lang-velocity/1.4.0
 
+### Enable Dynamic Scripting
+
+To use this plugin, enable dynamic scripting.
+For more information, see [enabling dynamic scripting](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-scripting.html#_enabling_dynamic_scripting "enabling dynamic scripting").
+
+    script.disable_dynamic: false
+
+
 ## References
 
 This plugin supports an executable script language(search script is not supported).
