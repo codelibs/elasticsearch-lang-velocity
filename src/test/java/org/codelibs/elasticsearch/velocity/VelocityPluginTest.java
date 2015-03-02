@@ -32,7 +32,7 @@ public class VelocityPluginTest {
         esHomeDir = File.createTempFile("eshome", "");
         esHomeDir.delete();
 
-        final File scriptDir = new File(esHomeDir, "config/scripts");
+        final File scriptDir = new File(esHomeDir, "config/node_1/scripts");
         scriptDir.mkdirs();
         Files.write(
                 "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}"
