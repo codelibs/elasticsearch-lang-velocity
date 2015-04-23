@@ -57,6 +57,7 @@ public class VelocityPluginTest {
             public void build(final int number, final Builder settingsBuilder) {
                 settingsBuilder.put("http.cors.enabled", true);
                 settingsBuilder.put("script.disable_dynamic", false);
+                settingsBuilder.put("script.velocity.work_dir", "/tmp/es-velocity");
             }
         }).build(
                 newConfigs().clusterName("es-lang-velocity").numOfNode(1)

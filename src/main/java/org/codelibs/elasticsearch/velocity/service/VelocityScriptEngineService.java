@@ -67,7 +67,12 @@ public class VelocityScriptEngineService extends AbstractComponent implements
             final Environment env) {
         super(settings);
 
-        workDir = new File(env.workFile(), "velocity");
+        Object workDirPath = settings.get("script.velocity.work_dir");
+        if (workDirPath == null) {
+            workDir = new File(env.workFile(), "velocity");
+        } else {
+            workDir = new File(workDirPath.toString());
+        }
         if (!workDir.exists() && !workDir.mkdirs()) {
             throw new VelocityException(
                     "Could not create a working directory: "
@@ -247,6 +252,12 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                         .getProperty("input.encoding");
                 if (encoding == null) {
                     encoding = "UTF-8";
+                }
+
+                if (!workDir.exists() && !workDir.mkdirs()) {
+                    throw new VelocityException(
+                            "Could not create a working directory: "
+                                    + workDir.getAbsolutePath());
                 }
 
                 templateFile = null;
