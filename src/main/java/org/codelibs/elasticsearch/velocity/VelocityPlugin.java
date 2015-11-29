@@ -1,13 +1,13 @@
 package org.codelibs.elasticsearch.velocity;
 
 import org.codelibs.elasticsearch.velocity.service.VelocityScriptEngineService;
-import org.elasticsearch.plugins.AbstractPlugin;
+import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.script.ScriptModule;
 
-public class VelocityPlugin extends AbstractPlugin {
+public class VelocityPlugin extends Plugin {
     @Override
     public String name() {
-        return "VelocityPlugin";
+        return "lang-velocity";
     }
 
     @Override

@@ -69,7 +69,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
         Object workDirPath = settings.get("script.velocity.work_dir");
         if (workDirPath == null) {
-            workDir = new File(env.workFile(), "velocity");
+            workDir = env.tmpFile().resolve("velocity").toFile();
         } else {
             workDir = new File(workDirPath.toString());
         }
@@ -103,7 +103,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         initPropertyValue(props, "ES_TMPL.resource.loader.class",
                 "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
         initPropertyValue(props, "ES_TMPL.resource.loader.path",
-                new File(env.configFile(), "scripts").getAbsolutePath());
+                env.configFile().resolve("scripts").toFile().getAbsolutePath());
         initPropertyValue(props, "ES_TMPL.resource.loader.cache", "true");
         initPropertyValue(props,
                 "ES_TMPL.resource.loader.modificationCheckInterval", "60");
@@ -111,8 +111,8 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         initPropertyValue(props, "velocimacro.library.autoreload", "false");
         initPropertyValue(props, "input.encoding", "UTF-8");
         initPropertyValue(props, "output.encoding", "UTF-8");
-        initPropertyValue(props, "runtime.log", new File(env.logsFile(),
-                "velocity.log").getAbsolutePath());
+        initPropertyValue(props, "runtime.log", env.logsFile()
+                .resolve("velocity.log").toFile().getAbsolutePath());
 
         velocityEngine = new VelocityEngine(props);
 
@@ -157,26 +157,27 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     }
 
     @Override
-    public ExecutableScript executable(final Object template,
-            final Map<String, Object> vars) {
-        return new VelocityExecutableScript((VelocityScriptTemplate) template,
-                vars);
+    public ExecutableScript executable(CompiledScript compiledScript,
+            Map<String, Object> vars) {
+        return new VelocityExecutableScript(
+                (VelocityScriptTemplate) compiledScript.compiled(), vars);
     }
 
     @Override
-    public SearchScript search(final Object template,
-            final SearchLookup lookup, final Map<String, Object> vars) {
+    public SearchScript search(CompiledScript compiledScript,
+            SearchLookup lookup, Map<String, Object> vars) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Object execute(final Object template, final Map<String, Object> vars) {
+    public Object execute(CompiledScript compiledScript,
+            Map<String, Object> vars) {
         final BytesStreamOutput result = new BytesStreamOutput();
         final UTF8StreamWriter writer = utf8StreamWriter().setOutput(result);
 
         try {
-            ((VelocityScriptTemplate) template).merge(
-                    new VelocityContext(vars), writer);
+            ((VelocityScriptTemplate) compiledScript.compiled())
+                    .merge(new VelocityContext(vars), writer);
             writer.flush();
         } catch (final IOException e) {
             logger.error(
@@ -366,5 +367,4 @@ public class VelocityScriptEngineService extends AbstractComponent implements
             return value;
         }
     }
-
 }
