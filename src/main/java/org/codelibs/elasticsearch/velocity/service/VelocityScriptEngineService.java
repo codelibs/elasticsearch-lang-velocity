@@ -144,7 +144,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     }
 
     @Override
-    public Object compile(final String script) {
+    public Object compile(final String script, final Map<String, String> params) {
         final VelocityScriptTemplate scriptTemplate = new VelocityScriptTemplate(
                 velocityEngine, workDir, script);
         final File templateFile = scriptTemplate.getTemplateFile();
