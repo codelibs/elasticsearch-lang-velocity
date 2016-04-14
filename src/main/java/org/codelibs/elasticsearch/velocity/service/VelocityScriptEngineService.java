@@ -170,37 +170,6 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     }
 
     @Override
-    public Object execute(CompiledScript compiledScript,
-            Map<String, Object> vars) {
-        final BytesStreamOutput result = new BytesStreamOutput();
-        final UTF8StreamWriter writer = utf8StreamWriter().setOutput(result);
-
-        try {
-            ((VelocityScriptTemplate) compiledScript.compiled())
-                    .merge(new VelocityContext(vars), writer);
-            writer.flush();
-        } catch (final IOException e) {
-            logger.error(
-                    "Could not execute query template (failed to flush writer): ",
-                    e);
-        } finally {
-            try {
-                writer.close();
-            } catch (final IOException e) {
-                logger.error(
-                        "Could not execute query template (failed to close writer): ",
-                        e);
-            }
-        }
-        return result.bytes();
-    }
-
-    @Override
-    public Object unwrap(final Object value) {
-        return value;
-    }
-
-    @Override
     public void scriptRemoved(final CompiledScript script) {
         final Object compiled = script.compiled();
         if (compiled instanceof VelocityScriptTemplate) {
