@@ -7,22 +7,26 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.ref.SoftReference;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.VelocityException;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.component.AbstractComponent;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.UTF8StreamWriter;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
+import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.script.CompiledScript;
@@ -46,7 +50,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
     private File workDir;
 
-    private List<File> templateFileList = new LinkedList<File>();
+    private Queue<File> templateFileQueue = new ConcurrentLinkedQueue<>();
 
     /**
      * If exists, reset and return, otherwise create, reset and return a writer.
@@ -114,9 +118,15 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         initPropertyValue(props, "runtime.log", env.logsFile()
                 .resolve("velocity.log").toFile().getAbsolutePath());
 
-        velocityEngine = new VelocityEngine(props);
+        velocityEngine = AccessController.doPrivileged(new PrivilegedAction<VelocityEngine>() {
+            @Override
+            public VelocityEngine run() {
+                VelocityEngine engine = new VelocityEngine(props);
+                engine.init();
+                return engine;
+            }
+        });
 
-        velocityEngine.init();
     }
 
     private boolean initPropertyValue(final Properties props, final String key,
@@ -149,18 +159,18 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                 velocityEngine, workDir, script);
         final File templateFile = scriptTemplate.getTemplateFile();
         if (templateFile != null) {
-            synchronized (templateFileList) {
-                templateFileList.add(templateFile);
+            if (logger.isDebugEnabled()) {
+                logger.debug("Adding {}", templateFile.getAbsolutePath());
             }
-        }
+            templateFileQueue.add(templateFile);
+         }
         return scriptTemplate;
     }
 
     @Override
     public ExecutableScript executable(CompiledScript compiledScript,
             Map<String, Object> vars) {
-        return new VelocityExecutableScript(
-                (VelocityScriptTemplate) compiledScript.compiled(), vars);
+        return new VelocityExecutableScript((VelocityScriptTemplate) compiledScript.compiled(), vars, logger);
     }
 
     @Override
@@ -176,9 +186,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
             final File templateFile = ((VelocityScriptTemplate) compiled)
                     .getTemplateFile();
             if (templateFile != null) {
-                synchronized (templateFileList) {
-                    templateFileList.remove(templateFile);
-                }
+                templateFileQueue.remove(templateFile);
                 if (logger.isDebugEnabled()) {
                     logger.debug("Deleting {}", templateFile.getAbsolutePath());
                 }
@@ -192,15 +200,12 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
     @Override
     public void close() {
-        synchronized (templateFileList) {
-            for (final File templateFile : templateFileList) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Deleting {}", templateFile.getAbsolutePath());
-                }
-                if (!templateFile.delete()) {
-                    logger.warn("Failed to delete {}.",
-                            templateFile.getAbsolutePath());
-                }
+        for (final File templateFile : templateFileQueue) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Deleting {}", templateFile.getAbsolutePath());
+            }
+            if (!templateFile.delete()) {
+                logger.warn("Failed to delete {}.", templateFile.getAbsolutePath());
             }
         }
     }
@@ -263,32 +268,32 @@ public class VelocityScriptEngineService extends AbstractComponent implements
 
         public void merge(final Context context, final Writer writer) {
             if (script != null) {
-                int length = script.length();
-                if (length > 10) {
-                    length = 10;
-                }
-                velocityEngine.evaluate(context, writer,
-                        script.substring(0, length), script);
+                final String logTag = Integer.toString(script.hashCode());
+                velocityEngine.evaluate(context, writer, logTag, script);
             } else {
                 template.merge(context, writer);
             }
         }
     }
 
-    private class VelocityExecutableScript implements ExecutableScript {
+    private static class VelocityExecutableScript implements ExecutableScript {
         /** Compiled template object. */
         private VelocityScriptTemplate context;
 
         /** Parameters to fill above object with. */
         private Map<String, Object> vars;
 
+        private ESLogger logger;
+
         /**
          * @param template the compiled template object
          * @param vars the parameters to fill above object with
+         * @param logger 
          **/
         public VelocityExecutableScript(final VelocityScriptTemplate context,
-                final Map<String, Object> vars) {
+                final Map<String, Object> vars, final ESLogger logger) {
             this.context = context;
+            this.logger = logger;
             if (vars == null) {
                 this.vars = Collections.emptyMap();
             } else {
@@ -311,9 +316,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
                 context.merge(new VelocityContext(vars), writer);
                 writer.flush();
             } catch (final Exception e) {
-                logger.error(
-                        "Could not execute query template (failed to flush writer): ",
-                        e);
+                throw new ElasticsearchException("Could not execute query template: ", e);
             } finally {
                 try {
                     writer.close();

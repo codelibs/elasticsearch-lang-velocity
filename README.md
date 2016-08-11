@@ -30,9 +30,13 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 ### Enable Dynamic Scripting
 
 To use this plugin, enable dynamic scripting.
-For more information, see [enabling dynamic scripting](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-scripting.html#_enabling_dynamic_scripting "enabling dynamic scripting").
+For more information, see [enabling dynamic scripting](https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-scripting.html#enable-dynamic-scripting "enabling dynamic scripting").
 
-    script.disable_dynamic: false
+    script.inline: true
+    script.indexed: true
+    script.file: true
+    script.search: true
+
 
 
 ## References
@@ -52,7 +56,7 @@ Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-s
         }
     }
 
-If you use a template file, please put template_name.vm into ${es.confing}/scripts and send the following query:
+If you use a template file, please put template\_name.vm into ${es.confing}/scripts and send the following query:
 
     GET /_search/template
     {
