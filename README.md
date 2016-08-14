@@ -10,7 +10,7 @@ This plugin add Velocity language to Elasticsearch.
 | Version   | Elasticsearch |
 |:---------:|:-------------:|
 | master    | 2.3.X         |
-| 2.3.0     | 2.3.1         |
+| 2.3.1     | 2.3.5         |
 | 2.2.0     | 2.2.2         |
 | 2.1.0     | 2.1.1         |
 | 1.5.0     | 1.5.1         |
@@ -25,7 +25,7 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 
 ### Install Velocity Language Plugin
 
-    $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-lang-velocity/2.3.0
+    $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-lang-velocity/2.3.1
 
 ### Enable Dynamic Scripting
 
