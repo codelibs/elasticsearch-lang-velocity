@@ -72,11 +72,10 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         super(settings);
 
         Object workDirPath = settings.get("script.velocity.work_dir");
-        if (workDirPath == null) {
-            workDir = env.tmpFile().resolve("velocity").toFile();
-        } else {
-            workDir = new File(workDirPath.toString());
+        if (workDirPath != null) {
+            logger.info("script.velocity.work_dir is deprecated.");
         }
+        workDir = env.scriptsFile().resolve("vm_cache").toFile();
         if (!workDir.exists() && !workDir.mkdirs()) {
             throw new VelocityException(
                     "Could not create a working directory: "
