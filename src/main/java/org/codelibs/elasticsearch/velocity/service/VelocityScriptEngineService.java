@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.ref.SoftReference;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Collections;
@@ -75,12 +76,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements
         if (workDirPath != null) {
             logger.info("script.velocity.work_dir is deprecated.");
         }
-        workDir = env.scriptsFile().resolve("vm_cache").toFile();
-        if (!workDir.exists() && !workDir.mkdirs()) {
-            throw new VelocityException(
-                    "Could not create a working directory: "
-                            + workDir.getAbsolutePath());
-        }
+        workDir = findWorkDir(env);
 
         final Properties props = new Properties();
         for (final Map.Entry<String, String> entry : settings
@@ -126,6 +122,20 @@ public class VelocityScriptEngineService extends AbstractComponent implements
             }
         });
 
+    }
+
+    private File findWorkDir(final Environment env) {
+        for (final Path path : env.dataFiles()) {
+            File vmCacheDir = path.resolve("vm_cache").toFile();
+            if (vmCacheDir.isDirectory()) {
+                return vmCacheDir;
+            } else if (vmCacheDir.exists()) {
+                continue;
+            } else if (vmCacheDir.mkdirs()) {
+                return vmCacheDir;
+            }
+        }
+        throw new VelocityException("Could not create a working directory.");
     }
 
     private boolean initPropertyValue(final Properties props, final String key,
