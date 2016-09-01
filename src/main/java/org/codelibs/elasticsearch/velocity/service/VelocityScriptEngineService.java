@@ -189,25 +189,6 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     }
 
     @Override
-    public void scriptRemoved(final CompiledScript script) {
-        final Object compiled = script.compiled();
-        if (compiled instanceof VelocityScriptTemplate) {
-            final File templateFile = ((VelocityScriptTemplate) compiled)
-                    .getTemplateFile();
-            if (templateFile != null) {
-                templateFileQueue.remove(templateFile);
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Deleting {}", templateFile.getAbsolutePath());
-                }
-                if (!templateFile.delete()) {
-                    logger.warn("Failed to delete {}.",
-                            templateFile.getAbsolutePath());
-                }
-            }
-        }
-    }
-
-    @Override
     public void close() {
         for (final File templateFile : templateFileQueue) {
             if (logger.isDebugEnabled()) {
