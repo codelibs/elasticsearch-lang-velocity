@@ -7,13 +7,16 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.ref.SoftReference;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.velocity.Template;
@@ -21,6 +24,7 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.VelocityException;
+import org.codelibs.elasticsearch.velocity.util.ContextProperties;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.component.AbstractComponent;
@@ -39,6 +43,8 @@ import org.elasticsearch.search.lookup.SearchLookup;
 public class VelocityScriptEngineService extends AbstractComponent implements
         ScriptEngineService {
 
+    public static final String VELOCITY_SCRIPT_CONTEXT_PROPS = "script.velocity.context.props.";
+
     public static String VELOCITY_SCRIPT_PROPS = "script.velocity.props.";
 
     /**
@@ -52,6 +58,8 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     private File workDir;
 
     private Queue<File> templateFileQueue = new ConcurrentLinkedQueue<>();
+
+    private Map<String, Object> contextPropMap = new ConcurrentHashMap<>();
 
     /**
      * If exists, reset and return, otherwise create, reset and return a writer.
@@ -77,6 +85,29 @@ public class VelocityScriptEngineService extends AbstractComponent implements
             logger.info("script.velocity.work_dir is deprecated.");
         }
         workDir = findWorkDir(env);
+
+        final Map<String, String> contextPropSettings = settings.getByPrefix(VELOCITY_SCRIPT_CONTEXT_PROPS).getAsMap();
+        for (Map.Entry<String, String> entry : contextPropSettings.entrySet()) {
+            String key = entry.getKey();
+            if (key.indexOf('.') == -1) {
+                final Path configFile = env.configFile();
+                final Path path = configFile.resolve(entry.getValue());
+                if (Files.exists(path)) {
+                    ContextProperties properties = new ContextProperties(path.toFile());
+                    contextPropMap.put(key, properties);
+                    final String interval = contextPropSettings.get(key + ".interval");
+                    if (interval != null) {
+                        try {
+                            properties.checkInterval = Long.parseLong(interval);
+                        } catch (NumberFormatException e) {
+                            logger.warn("{} is not long type.", e, interval);
+                        }
+                    }
+                } else {
+                    logger.warn("{} is not found.", path);
+                }
+            }
+        }
 
         final Properties props = new Properties();
         for (final Map.Entry<String, String> entry : settings
@@ -179,7 +210,14 @@ public class VelocityScriptEngineService extends AbstractComponent implements
     @Override
     public ExecutableScript executable(CompiledScript compiledScript,
             Map<String, Object> vars) {
-        return new VelocityExecutableScript((VelocityScriptTemplate) compiledScript.compiled(), vars, logger);
+        final Map<String, Object> scriptVars;
+        if (!contextPropMap.isEmpty()) {
+            scriptVars = new HashMap<>(contextPropMap);
+            scriptVars.putAll(vars);
+        } else {
+            scriptVars = vars;
+        }
+        return new VelocityExecutableScript((VelocityScriptTemplate) compiledScript.compiled(), scriptVars, logger);
     }
 
     @Override
