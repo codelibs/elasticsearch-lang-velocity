@@ -9,7 +9,7 @@ This plugin add Velocity language to Elasticsearch.
 
 | Version   | Elasticsearch |
 |:---------:|:-------------:|
-| master    | 2.4.X         |
+| master    | 5.5.X         |
 | 2.4.0     | 2.4.0         |
 | 2.3.3     | 2.3.5         |
 | 2.2.0     | 2.2.2         |
@@ -24,7 +24,11 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 
 ## Installation
 
-### Install Velocity Language Plugin
+### For 5.x
+
+    $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-lang-velocity:5.5.0
+
+### For 2.x
 
     $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-lang-velocity/2.4.0
 
@@ -34,10 +38,9 @@ To use this plugin, enable dynamic scripting.
 For more information, see [enabling dynamic scripting](https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-scripting.html#enable-dynamic-scripting "enabling dynamic scripting").
 
     script.inline: true
-    script.indexed: true
+    script.stored: true
     script.file: true
     script.search: true
-
 
 
 ## References
@@ -48,7 +51,7 @@ This plugin supports an executable script language(search script is not supporte
 
 Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-sstmpl "Script-based Search Template") Plugin, you can search by Velocity template.
 
-    GET /_search/template
+    GET /_search/script_template
     {
         "lang": "velocity",
         "template": "{\"query\": {\"match\": {\"title\": \"${query_string}\"}}}",
@@ -59,7 +62,7 @@ Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-s
 
 If you use a template file, please put template\_name.vm into ${es.confing}/scripts and send the following query:
 
-    GET /_search/template
+    GET /_search/script_template
     {
         "lang": "velocity",
         "template": {"file":"template_name"},
@@ -76,3 +79,4 @@ The file extension for Velocity's template is .vm or .velocity.
 ### Use Template Cache
 
 To use a template cache for Velocity template, please prepend "##cache" to the template file.
+

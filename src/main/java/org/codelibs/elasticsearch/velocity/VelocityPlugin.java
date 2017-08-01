@@ -1,22 +1,26 @@
 package org.codelibs.elasticsearch.velocity;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.codelibs.elasticsearch.velocity.service.VelocityScriptEngineService;
+import org.elasticsearch.common.settings.Setting;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.script.ScriptModule;
+import org.elasticsearch.plugins.ScriptPlugin;
+import org.elasticsearch.script.ScriptEngineService;
 
-public class VelocityPlugin extends Plugin {
-    @Override
-    public String name() {
-        return "lang-velocity";
-    }
+public class VelocityPlugin extends Plugin implements ScriptPlugin {
 
     @Override
-    public String description() {
-        return "This plugin provides Velocity language as a script.";
+    public ScriptEngineService getScriptEngineService(Settings settings) {
+        return new VelocityScriptEngineService(settings);
     }
 
-    public void onModule(final ScriptModule module) {
-        module.addScriptEngine(VelocityScriptEngineService.class);
+    @Override
+    public List<Setting<?>> getSettings() {
+        return Arrays.asList(VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONFIG_FILE,
+                VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE,
+                VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL);
     }
-
 }

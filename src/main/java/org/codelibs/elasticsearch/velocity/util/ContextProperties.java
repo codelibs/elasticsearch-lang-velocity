@@ -52,6 +52,10 @@ public class ContextProperties extends Properties {
         load();
     }
 
+    public String getName() {
+        return propertiesFile.getName().split("\\.")[0];
+    }
+
     public boolean isUpdated() {
         final long now = System.currentTimeMillis();
         if (now - lastChecked < checkInterval) {
