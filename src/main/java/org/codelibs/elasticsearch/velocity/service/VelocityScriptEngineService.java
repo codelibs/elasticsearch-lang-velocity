@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -146,7 +148,12 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     }
 
     private File findWorkDir(final Settings settings) {
-        for (final String path : Environment.PATH_DATA_SETTING.get(settings)) {
+        final List<String> lookupPathList = new ArrayList<>();
+        List<String> pathList = Environment.PATH_DATA_SETTING.get(settings);
+        if (pathList.isEmpty()) {
+            pathList = Arrays.asList(new File(Environment.PATH_HOME_SETTING.get(settings), "data").getAbsolutePath());
+        }
+        for (final String path : pathList) {
             final File vmCacheDir = Paths.get(path, "vm_cache").toFile();
             if (vmCacheDir.isDirectory()) {
                 return vmCacheDir;
@@ -155,8 +162,10 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
             } else if (vmCacheDir.mkdirs()) {
                 return vmCacheDir;
             }
+            lookupPathList.add(vmCacheDir.getAbsolutePath());
         }
-        throw new VelocityException("Could not create a working directory.");
+        throw new ElasticsearchException(
+                "Could not create a working directory: " + String.join(", ", lookupPathList.toArray(new String[lookupPathList.size()])));
     }
 
     private boolean initPropertyValue(final Properties props, final String key, final String value) {
