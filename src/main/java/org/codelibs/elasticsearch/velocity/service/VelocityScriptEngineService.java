@@ -37,6 +37,7 @@ import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.script.CompiledScript;
 import org.elasticsearch.script.ExecutableScript;
@@ -46,12 +47,13 @@ import org.elasticsearch.search.lookup.SearchLookup;
 
 public class VelocityScriptEngineService extends AbstractComponent implements ScriptEngineService {
 
-    public static Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS = Setting.groupSetting("script.velocity.props.", Property.NodeScope);
+    public static final Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS =
+            Setting.groupSetting("script.velocity.props.", Property.NodeScope);
 
-    public static Setting<List<String>> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE =
+    public static final Setting<List<String>> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE =
             Setting.listSetting("script.velocity.context.prop.file", Collections.emptyList(), s -> s, Property.NodeScope);
 
-    public static Setting<TimeValue> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL =
+    public static final Setting<TimeValue> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL =
             Setting.timeSetting("script.velocity.context.prop.interval", TimeValue.MINUS_ONE, Property.NodeScope);
 
     public static final String NAME = "velocity";
@@ -69,6 +71,8 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     private final Queue<File> templateFileQueue = new ConcurrentLinkedQueue<>();
 
     private final Map<String, Object> contextPropMap = new ConcurrentHashMap<>();
+
+    private ThreadContext threadContext;
 
     /**
      * If exists, reset and return, otherwise create, reset and return a writer.
@@ -196,10 +200,11 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         final Map<String, Object> scriptVars;
         if (!contextPropMap.isEmpty()) {
             scriptVars = new HashMap<>(contextPropMap);
-            scriptVars.putAll(vars);
         } else {
-            scriptVars = vars;
+            scriptVars = new HashMap<>();
         }
+        scriptVars.putAll(vars);
+        scriptVars.put("threadContext", threadContext);
         return new VelocityExecutableScript((VelocityScriptTemplate) compiledScript.compiled(), scriptVars, logger);
     }
 
@@ -338,5 +343,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         public Object unwrap(final Object value) {
             return value;
         }
+    }
+
+    public void setThreadContext(ThreadContext threadContext) {
+        this.threadContext = threadContext;
     }
 }
