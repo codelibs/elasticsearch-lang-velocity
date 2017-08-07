@@ -28,8 +28,9 @@ public class VelocityPlugin extends Plugin implements ScriptPlugin {
         return scriptEngineService;
     }
 
-    public Collection<Object> createComponents(Client client, ClusterService clusterService, ThreadPool threadPool,
-            ResourceWatcherService resourceWatcherService, ScriptService scriptService, NamedXContentRegistry xContentRegistry) {
+    @Override
+    public Collection<Object> createComponents(final Client client, final ClusterService clusterService, final ThreadPool threadPool,
+            final ResourceWatcherService resourceWatcherService, final ScriptService scriptService, final NamedXContentRegistry xContentRegistry) {
         scriptEngineService.setThreadContext(threadPool.getThreadContext());
         return Collections.emptyList();
     }
@@ -37,7 +38,6 @@ public class VelocityPlugin extends Plugin implements ScriptPlugin {
     @Override
     public List<Setting<?>> getSettings() {
         return Arrays.asList(VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_PROPS,
-                VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE,
-                VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL);
+                VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROPS);
     }
 }

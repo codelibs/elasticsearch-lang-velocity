@@ -209,9 +209,10 @@ public class VelocityPluginTest {
                 settingsBuilder.put("http.cors.enabled", true);
                 settingsBuilder.put("http.cors.allow-origin", "*");
                 settingsBuilder.put("script.velocity.props.ES_TMPL.resource.loader.modificationCheckInterval", "0");
-                settingsBuilder.put("script.velocity.context.prop.interval", "0");
-                settingsBuilder.putArray("script.velocity.context.prop.file", "file1.properties", "props/file2.properties",
-                        "file3.properties");
+                settingsBuilder.put("script.velocity.context.props.file1.interval", "0");
+                settingsBuilder.put("script.velocity.context.props.file1", "file1.properties");
+                settingsBuilder.put("script.velocity.context.props.file2", "props/file2.properties");
+                settingsBuilder.put("script.velocity.context.props.file3", "file3.properties");
                 settingsBuilder.putArray("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
             }
         }).build(newConfigs().clusterName(clusterName).numOfNode(1)

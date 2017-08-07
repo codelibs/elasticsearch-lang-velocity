@@ -38,7 +38,6 @@ import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.script.CompiledScript;
@@ -52,11 +51,8 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     public static final Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS =
             Setting.groupSetting("script.velocity.props.", Property.NodeScope);
 
-    public static final Setting<List<String>> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE =
-            Setting.listSetting("script.velocity.context.prop.file", Collections.emptyList(), s -> s, Property.NodeScope);
-
-    public static final Setting<TimeValue> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL =
-            Setting.timeSetting("script.velocity.context.prop.interval", TimeValue.MINUS_ONE, Property.NodeScope);
+    public static final Setting<Settings> SETTING_SCRIPT_VELOCITY_CONTEXT_PROPS =
+            Setting.groupSetting("script.velocity.context.props.", Property.NodeScope);
 
     public static final String NAME = "velocity";
 
@@ -96,18 +92,25 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         workDir = findWorkDir(settings);
 
         final Path configPath = Paths.get(Environment.PATH_CONF_SETTING.get(settings));
-        final List<String> propList = SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE.get(settings);
-        final TimeValue propInterval = SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL.get(settings);
-        for (final String propPath : propList) {
-            final Path path = configPath.resolve(propPath);
-            if (Files.exists(path)) {
-                final ContextProperties properties = new ContextProperties(path.toFile());
-                contextPropMap.put(properties.getName(), properties);
-                if (propInterval.millis() >= 0) {
-                    properties.checkInterval = propInterval.millis();
+        final Map<String, String> contextPropSettings = SETTING_SCRIPT_VELOCITY_CONTEXT_PROPS.get(settings).getAsMap();
+        for (final Map.Entry<String, String> entry : contextPropSettings.entrySet()) {
+            final String key = entry.getKey();
+            if (key.indexOf('.') == -1) {
+                final Path path = configPath.resolve(entry.getValue());
+                if (exists(path)) {
+                    final ContextProperties properties = new ContextProperties(path.toFile());
+                    contextPropMap.put(key, properties);
+                    final String interval = contextPropSettings.get(key + ".interval");
+                    if (interval != null) {
+                        try {
+                            properties.checkInterval = Long.parseLong(interval);
+                        } catch (final NumberFormatException e) {
+                            logger.warn("{} is not long type.", e, interval);
+                        }
+                    }
+                } else {
+                    logger.warn("{} is not found.", path);
                 }
-            } else {
-                logger.warn("{} is not found.", path);
             }
         }
 
@@ -145,6 +148,12 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
             return engine;
         });
 
+    }
+
+    private boolean exists(final Path path) {
+        return AccessController.doPrivileged((PrivilegedAction<Boolean>) () -> {
+            return Files.exists(path);
+        });
     }
 
     private File findWorkDir(final Settings settings) {
@@ -354,7 +363,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         }
     }
 
-    public void setThreadContext(ThreadContext threadContext) {
+    public void setThreadContext(final ThreadContext threadContext) {
         this.threadContext = threadContext;
     }
 }
