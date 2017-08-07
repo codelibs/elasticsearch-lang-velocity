@@ -10,6 +10,7 @@ This plugin add Velocity language to Elasticsearch.
 | Version   | Elasticsearch |
 |:---------:|:-------------:|
 | master    | 5.5.X         |
+| 5.5.0     | 5.5.1         |
 | 2.4.0     | 2.4.0         |
 | 2.3.3     | 2.3.5         |
 | 2.2.0     | 2.2.2         |
@@ -65,7 +66,7 @@ If you use a template file, please put template\_name.vm into ${es.confing}/scri
     GET /_search/script_template
     {
         "lang": "velocity",
-        "template": {"file":"template_name"},
+        "file":"template_name",
         "params": {
             "query_string": "search for these words"
         }
