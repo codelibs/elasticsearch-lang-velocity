@@ -197,7 +197,6 @@ public class VelocityPluginTest {
         Files.write(new File(confDir, "file1.properties").toPath(), "my_size=5".getBytes());
         Files.write(new File(confDir, "props/file2.properties").toPath(),
                 "my_size.0=1\nmy_size.1=2\nmy_size.2=3\nmy_size.3=4\nmy_size.4=5".getBytes());
-        Files.write(new File(confDir, "velocity.properties").toPath(), "ES_TMPL.resource.loader.modificationCheckInterval=0".getBytes());
 
         runner = new ElasticsearchClusterRunner();
         runner.onBuild(new ElasticsearchClusterRunner.Builder() {
@@ -209,9 +208,10 @@ public class VelocityPluginTest {
                 settingsBuilder.put("script.search", "on");
                 settingsBuilder.put("http.cors.enabled", true);
                 settingsBuilder.put("http.cors.allow-origin", "*");
-                settingsBuilder.put("script.velocity.config.file", "velocity.properties");
+                settingsBuilder.put("script.velocity.props.ES_TMPL.resource.loader.modificationCheckInterval", "0");
                 settingsBuilder.put("script.velocity.context.prop.interval", "0");
-                settingsBuilder.putArray("script.velocity.context.prop.file", "file1.properties", "props/file2.properties", "file3.properties");
+                settingsBuilder.putArray("script.velocity.context.prop.file", "file1.properties", "props/file2.properties",
+                        "file3.properties");
                 settingsBuilder.putArray("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
             }
         }).build(newConfigs().clusterName(clusterName).numOfNode(1)

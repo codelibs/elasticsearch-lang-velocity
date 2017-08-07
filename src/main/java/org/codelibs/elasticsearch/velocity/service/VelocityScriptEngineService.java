@@ -2,10 +2,8 @@ package org.codelibs.elasticsearch.velocity.service;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.ref.SoftReference;
@@ -48,8 +46,7 @@ import org.elasticsearch.search.lookup.SearchLookup;
 
 public class VelocityScriptEngineService extends AbstractComponent implements ScriptEngineService {
 
-    public static Setting<String> SETTING_SCRIPT_VELOCITY_CONFIG_FILE =
-            Setting.simpleString("script.velocity.config.file", Property.NodeScope);
+    public static Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS = Setting.groupSetting("script.velocity.props.", Property.NodeScope);
 
     public static Setting<List<String>> SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE =
             Setting.listSetting("script.velocity.context.prop.file", Collections.emptyList(), s -> s, Property.NodeScope);
@@ -69,9 +66,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
 
     private File workDir;
 
-    private Queue<File> templateFileQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<File> templateFileQueue = new ConcurrentLinkedQueue<>();
 
-    private Map<String, Object> contextPropMap = new ConcurrentHashMap<>();
+    private final Map<String, Object> contextPropMap = new ConcurrentHashMap<>();
 
     /**
      * If exists, reset and return, otherwise create, reset and return a writer.
@@ -98,7 +95,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         for (final String propPath : propList) {
             final Path path = configPath.resolve(propPath);
             if (Files.exists(path)) {
-                ContextProperties properties = new ContextProperties(path.toFile());
+                final ContextProperties properties = new ContextProperties(path.toFile());
                 contextPropMap.put(properties.getName(), properties);
                 if (propInterval.millis() >= 0) {
                     properties.checkInterval = propInterval.millis();
@@ -108,14 +105,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
             }
         }
 
-        File configFile = new File(SETTING_SCRIPT_VELOCITY_CONFIG_FILE.get(settings));
-        Properties props = new Properties();
-        if (configFile.exists()) {
-            try (InputStream in = new FileInputStream(configFile)) {
-                props.load(in);
-            } catch (final IOException e) {
-                throw new ElasticsearchException("Failed to read " + configFile.getAbsolutePath(), e);
-            }
+        final Properties props = new Properties();
+        for (final Map.Entry<String, String> entry : SETTING_SCRIPT_VELOCITY_PROPS.get(settings).getAsMap().entrySet()) {
+            props.put(entry.getKey(), entry.getValue());
         }
 
         final String resourceLoader = (String) props.get("resource.loader");
@@ -141,13 +133,10 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         initPropertyValue(props, "output.encoding", "UTF-8");
         initPropertyValue(props, "runtime.log", logsFile.resolve("velocity.log").toFile().getAbsolutePath());
 
-        velocityEngine = AccessController.doPrivileged(new PrivilegedAction<VelocityEngine>() {
-            @Override
-            public VelocityEngine run() {
-                VelocityEngine engine = new VelocityEngine(props);
-                engine.init();
-                return engine;
-            }
+        velocityEngine = AccessController.doPrivileged((PrivilegedAction<VelocityEngine>) () -> {
+            final VelocityEngine engine = new VelocityEngine(props);
+            engine.init();
+            return engine;
         });
 
     }
@@ -190,7 +179,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     }
 
     @Override
-    public Object compile(String templateName, String templateSource, Map<String, String> params) {
+    public Object compile(final String templateName, final String templateSource, final Map<String, String> params) {
         final VelocityScriptTemplate scriptTemplate = new VelocityScriptTemplate(velocityEngine, workDir, templateSource);
         final File templateFile = scriptTemplate.getTemplateFile();
         if (templateFile != null) {
@@ -203,7 +192,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     }
 
     @Override
-    public ExecutableScript executable(CompiledScript compiledScript, Map<String, Object> vars) {
+    public ExecutableScript executable(final CompiledScript compiledScript, final Map<String, Object> vars) {
         final Map<String, Object> scriptVars;
         if (!contextPropMap.isEmpty()) {
             scriptVars = new HashMap<>(contextPropMap);
@@ -215,7 +204,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     }
 
     @Override
-    public SearchScript search(CompiledScript compiledScript, SearchLookup lookup, Map<String, Object> vars) {
+    public SearchScript search(final CompiledScript compiledScript, final SearchLookup lookup, final Map<String, Object> vars) {
         throw new UnsupportedOperationException();
     }
 
@@ -238,7 +227,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
 
         private String script;
 
-        private VelocityEngine velocityEngine;
+        private final VelocityEngine velocityEngine;
 
         public VelocityScriptTemplate(final VelocityEngine velocityEngine, final File workDir, final String script) {
             this.velocityEngine = velocityEngine;
@@ -293,17 +282,17 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
 
     private static class VelocityExecutableScript implements ExecutableScript {
         /** Compiled template object. */
-        private VelocityScriptTemplate context;
+        private final VelocityScriptTemplate context;
 
         /** Parameters to fill above object with. */
         private Map<String, Object> vars;
 
-        private Logger logger;
+        private final Logger logger;
 
         /**
          * @param template the compiled template object
          * @param vars the parameters to fill above object with
-         * @param logger 
+         * @param logger
          **/
         public VelocityExecutableScript(final VelocityScriptTemplate context, final Map<String, Object> vars, final Logger logger) {
             this.context = context;
@@ -338,7 +327,7 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
                 }
             }
 
-            BytesReference bytes = result.bytes();
+            final BytesReference bytes = result.bytes();
             if (logger.isDebugEnabled()) {
                 logger.debug("output: {}", bytes.utf8ToString());
             }

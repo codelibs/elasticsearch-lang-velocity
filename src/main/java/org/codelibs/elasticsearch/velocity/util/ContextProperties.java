@@ -73,28 +73,25 @@ public class ContextProperties extends Properties {
     }
 
     public synchronized void load() {
-        properties = AccessController.doPrivileged(new PrivilegedAction<Properties>() {
-            @Override
-            public Properties run() {
-                final Properties prop = new Properties();
-                FileInputStream fis = null;
-                try {
-                    fis = new FileInputStream(propertiesFile);
-                    lastModified = propertiesFile.lastModified();
-                    prop.load(fis);
-                } catch (final IOException e) {
-                    throw new ElasticsearchException(e);
-                } finally {
-                    if (fis != null) {
-                        try {
-                            fis.close();
-                        } catch (final IOException e) {
-                            // ignore
-                        }
+        properties = AccessController.doPrivileged((PrivilegedAction<Properties>) () -> {
+            final Properties prop = new Properties();
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(propertiesFile);
+                lastModified = propertiesFile.lastModified();
+                prop.load(fis);
+            } catch (final IOException e1) {
+                throw new ElasticsearchException(e1);
+            } finally {
+                if (fis != null) {
+                    try {
+                        fis.close();
+                    } catch (final IOException e2) {
+                        // ignore
                     }
                 }
-                return prop;
             }
+            return prop;
         });
     }
 

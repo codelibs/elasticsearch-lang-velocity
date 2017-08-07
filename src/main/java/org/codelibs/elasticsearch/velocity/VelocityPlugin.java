@@ -13,13 +13,13 @@ import org.elasticsearch.script.ScriptEngineService;
 public class VelocityPlugin extends Plugin implements ScriptPlugin {
 
     @Override
-    public ScriptEngineService getScriptEngineService(Settings settings) {
+    public ScriptEngineService getScriptEngineService(final Settings settings) {
         return new VelocityScriptEngineService(settings);
     }
 
     @Override
     public List<Setting<?>> getSettings() {
-        return Arrays.asList(VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONFIG_FILE,
+        return Arrays.asList(VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_PROPS,
                 VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_FILE,
                 VelocityScriptEngineService.SETTING_SCRIPT_VELOCITY_CONTEXT_PROP_INTERVAL);
     }
