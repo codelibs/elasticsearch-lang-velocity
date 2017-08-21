@@ -7,16 +7,7 @@ This plugin add Velocity language to Elasticsearch.
 
 ## Version
 
-| Version   | Elasticsearch |
-|:---------:|:-------------:|
-| master    | 5.5.X         |
-| 5.5.0     | 5.5.1         |
-| 2.4.0     | 2.4.0         |
-| 2.3.3     | 2.3.5         |
-| 2.2.0     | 2.2.2         |
-| 2.1.0     | 2.1.1         |
-| 1.5.0     | 1.5.1         |
-| 1.4.0     | 1.4.0         |
+[Versions in Maven Repository](http://central.maven.org/maven2/org/codelibs/elasticsearch-lang-velocity/)
 
 ### Issues/Questions
 
