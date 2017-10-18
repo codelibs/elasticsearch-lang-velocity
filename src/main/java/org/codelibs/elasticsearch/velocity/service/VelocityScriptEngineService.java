@@ -283,7 +283,11 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
                     }
                 }
 
-                template = velocityEngine.getTemplate(templateFile.getName());
+                template = AccessController
+                        .doPrivileged((PrivilegedAction<Template>) () -> {
+                            return velocityEngine
+                                    .getTemplate(templateFile.getName());
+                        });
             } else {
                 this.script = script;
             }
@@ -296,9 +300,16 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         public void merge(final Context context, final Writer writer) {
             if (script != null) {
                 final String logTag = Integer.toString(script.hashCode());
-                velocityEngine.evaluate(context, writer, logTag, script);
+                AccessController
+                        .doPrivileged((PrivilegedAction<Boolean>) () -> {
+                            return velocityEngine.evaluate(context, writer,
+                                    logTag, script);
+                        });
             } else {
-                template.merge(context, writer);
+                AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+                    template.merge(context, writer);
+                    return null;
+                });
             }
         }
     }
