@@ -69,6 +69,7 @@ public class VelocityPluginTest {
         runner.ensureGreen();
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void test_search() throws Exception {
         setupEs();
@@ -178,6 +179,7 @@ public class VelocityPluginTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void test_search_withProp() throws Exception {
         clusterName = "es-velocity-" + System.currentTimeMillis();
@@ -268,5 +270,29 @@ public class VelocityPluginTest {
             assertThat(8, is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
         }
 
+    }
+
+    @Test
+    public void test_render() throws Exception {
+        setupEs();
+
+        assertThat(1, is(runner.getNodeSize()));
+
+        final Node node = runner.node();
+
+        try (CurlResponse curlResponse = Curl.post(node, "/_search/script_template/velocity/index_search_query_1").body(
+                "{\"template\":\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${my_size}\\\"}\"}")
+                .execute()) {
+            assertThat(200, is(curlResponse.getHttpStatusCode()));
+        }
+
+        String query;
+
+        query = "{\"lang\":\"velocity\",\"inline\":\"{\\\"query\\\":{\\\"match\\\":{\\\"$my_field\\\":\\\"$my_value\\\"}},\\\"size\\\":\\\"$my_size\\\"}\","
+                + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+        try (CurlResponse curlResponse = Curl.post(node, "/_render/script_template").body(query).execute()) {
+            final String content = curlResponse.getContentAsString();
+            assertEquals("{\"template_output\":{\"query\":{\"match\":{\"category\":\"1\"}},\"size\":\"50\"}}", content);
+        }
     }
 }
