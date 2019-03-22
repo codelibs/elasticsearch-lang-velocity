@@ -5,8 +5,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.ref.SoftReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,6 +23,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -31,22 +32,18 @@ import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.VelocityException;
 import org.codelibs.elasticsearch.velocity.util.ContextProperties;
 import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.common.bytes.BytesReference;
-import org.elasticsearch.common.component.AbstractComponent;
-import org.elasticsearch.common.io.UTF8StreamWriter;
-import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.env.Environment;
-import org.elasticsearch.script.CompiledScript;
-import org.elasticsearch.script.ExecutableScript;
-import org.elasticsearch.script.ScriptEngineService;
-import org.elasticsearch.script.SearchScript;
-import org.elasticsearch.search.lookup.SearchLookup;
+import org.elasticsearch.script.ScriptContext;
+import org.elasticsearch.script.ScriptEngine;
+import org.elasticsearch.script.TemplateScript;
 
-public class VelocityScriptEngineService extends AbstractComponent implements ScriptEngineService {
+public class VelocityScriptEngineService implements ScriptEngine {
+
+    private static Logger logger = LogManager.getLogger(VelocityScriptEngineService.class);
 
     public static final Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS =
             Setting.groupSetting("script.velocity.props.", Property.NodeScope);
@@ -55,12 +52,6 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
             Setting.groupSetting("script.velocity.context.props.", Property.NodeScope);
 
     public static final String NAME = "velocity";
-
-    /**
-     * Thread local UTF8StreamWriter to store template execution results in,
-     * thread local to save object creation.
-     */
-    private static ThreadLocal<SoftReference<UTF8StreamWriter>> utf8StreamWriter = new ThreadLocal<>();
 
     private VelocityEngine velocityEngine;
 
@@ -72,31 +63,14 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
 
     private ThreadContext threadContext;
 
-    /**
-     * If exists, reset and return, otherwise create, reset and return a writer.
-     */
-    private static UTF8StreamWriter utf8StreamWriter() {
-        final SoftReference<UTF8StreamWriter> ref = utf8StreamWriter.get();
-        UTF8StreamWriter writer = ref == null ? null : ref.get();
-        if (writer == null) {
-            writer = new UTF8StreamWriter(1024 * 4);
-            utf8StreamWriter.set(new SoftReference<>(writer));
-        }
-        writer.reset();
-        return writer;
-    }
-
-    public VelocityScriptEngineService(final Settings settings) {
-        super(settings);
+    public VelocityScriptEngineService(final Settings settings, Path configPath) {
 
         workDir = findWorkDir(settings);
 
-        final Path configPath = Paths.get(Environment.PATH_CONF_SETTING.get(settings));
-        final Map<String, String> contextPropSettings = SETTING_SCRIPT_VELOCITY_CONTEXT_PROPS.get(settings).getAsMap();
-        for (final Map.Entry<String, String> entry : contextPropSettings.entrySet()) {
-            final String key = entry.getKey();
+        final Settings contextPropSettings = settings.getByPrefix(SETTING_SCRIPT_VELOCITY_CONTEXT_PROPS.getKey());
+        for (final String key : contextPropSettings.keySet()) {
             if (key.indexOf('.') == -1) {
-                final Path path = configPath.resolve(entry.getValue());
+                final Path path = configPath.resolve(contextPropSettings.get(key));
                 if (exists(path)) {
                     final ContextProperties properties = new ContextProperties(path.toFile());
                     contextPropMap.put(key, properties);
@@ -115,8 +89,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         }
 
         final Properties props = new Properties();
-        for (final Map.Entry<String, String> entry : SETTING_SCRIPT_VELOCITY_PROPS.get(settings).getAsMap().entrySet()) {
-            props.put(entry.getKey(), entry.getValue());
+        final Settings velocitySettings = settings.getByPrefix(SETTING_SCRIPT_VELOCITY_PROPS.getKey());
+        for (final String key : velocitySettings.keySet()) {
+            props.put(key, velocitySettings.get(key));
         }
 
         final String resourceLoader = (String) props.get("resource.loader");
@@ -191,17 +166,8 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
     }
 
     @Override
-    public String getExtension() {
-        return "vm";
-    }
-
-    @Override
-    public boolean isInlineScriptEnabled() {
-        return true;
-    }
-
-    @Override
-    public Object compile(final String templateName, final String templateSource, final Map<String, String> params) {
+    public <T> T compile(final String templateName, final String templateSource, ScriptContext<T> context,
+            final Map<String, String> options) {
         final VelocityScriptTemplate scriptTemplate = new VelocityScriptTemplate(velocityEngine, workDir, templateSource);
         final File templateFile = scriptTemplate.getTemplateFile();
         if (templateFile != null) {
@@ -210,25 +176,18 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
             }
             templateFileQueue.add(templateFile);
         }
-        return scriptTemplate;
-    }
-
-    @Override
-    public ExecutableScript executable(final CompiledScript compiledScript, final Map<String, Object> vars) {
-        final Map<String, Object> scriptVars;
-        if (!contextPropMap.isEmpty()) {
-            scriptVars = new HashMap<>(contextPropMap);
-        } else {
-            scriptVars = new HashMap<>();
-        }
-        scriptVars.putAll(vars);
-        scriptVars.put("threadContext", threadContext);
-        return new VelocityExecutableScript((VelocityScriptTemplate) compiledScript.compiled(), scriptVars, logger);
-    }
-
-    @Override
-    public SearchScript search(final CompiledScript compiledScript, final SearchLookup lookup, final Map<String, Object> vars) {
-        throw new UnsupportedOperationException();
+        TemplateScript.Factory compiled = params -> {
+            final Map<String, Object> scriptVars;
+            if (!contextPropMap.isEmpty()) {
+                scriptVars = new HashMap<>(contextPropMap);
+            } else {
+                scriptVars = new HashMap<>();
+            }
+            scriptVars.putAll(params);
+            scriptVars.put("threadContext", threadContext);
+            return new VelocityExecutableScript(scriptTemplate, scriptVars);
+        };
+        return context.factoryClazz.cast(compiled);
     }
 
     @Override
@@ -283,11 +242,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
                     }
                 }
 
-                template = AccessController
-                        .doPrivileged((PrivilegedAction<Template>) () -> {
-                            return velocityEngine
-                                    .getTemplate(templateFile.getName());
-                        });
+                template = AccessController.doPrivileged((PrivilegedAction<Template>) () -> {
+                    return velocityEngine.getTemplate(templateFile.getName());
+                });
             } else {
                 this.script = script;
             }
@@ -300,11 +257,9 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         public void merge(final Context context, final Writer writer) {
             if (script != null) {
                 final String logTag = Integer.toString(script.hashCode());
-                AccessController
-                        .doPrivileged((PrivilegedAction<Boolean>) () -> {
-                            return velocityEngine.evaluate(context, writer,
-                                    logTag, script);
-                        });
+                AccessController.doPrivileged((PrivilegedAction<Boolean>) () -> {
+                    return velocityEngine.evaluate(context, writer, logTag, script);
+                });
             } else {
                 AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
                     template.merge(context, writer);
@@ -314,67 +269,38 @@ public class VelocityScriptEngineService extends AbstractComponent implements Sc
         }
     }
 
-    private static class VelocityExecutableScript implements ExecutableScript {
+    private static class VelocityExecutableScript extends TemplateScript {
         /** Compiled template object. */
         private final VelocityScriptTemplate context;
-
-        /** Parameters to fill above object with. */
-        private Map<String, Object> vars;
-
-        private final Logger logger;
 
         /**
          * @param template the compiled template object
          * @param vars the parameters to fill above object with
-         * @param logger
          **/
-        public VelocityExecutableScript(final VelocityScriptTemplate context, final Map<String, Object> vars, final Logger logger) {
+        public VelocityExecutableScript(final VelocityScriptTemplate context, final Map<String, Object> vars) {
+            super(vars == null ? Collections.emptyMap() : vars);
             this.context = context;
-            this.logger = logger;
-            if (vars == null) {
-                this.vars = Collections.emptyMap();
-            } else {
-                this.vars = vars;
-            }
         }
 
         @Override
-        public void setNextVar(final String name, final Object value) {
-            vars.put(name, value);
-        }
-
-        @Override
-        public Object run() {
-            final BytesStreamOutput result = new BytesStreamOutput();
-            final UTF8StreamWriter writer = utf8StreamWriter().setOutput(result);
-
-            try {
-                context.merge(new VelocityContext(vars), writer);
+        public String execute() {
+            try (final StringWriter writer = new StringWriter()) {
+                context.merge(new VelocityContext(getParams()), writer);
                 writer.flush();
+
+                final String content = writer.toString();
+                if (logger.isDebugEnabled()) {
+                    logger.debug("output: {}", content);
+                }
+                return content;
             } catch (final Exception e) {
                 throw new ElasticsearchException("Could not execute query template: ", e);
-            } finally {
-                try {
-                    writer.close();
-                } catch (final IOException e) {
-                    logger.error("Could not execute query template (failed to close writer): ", e);
-                }
             }
-
-            final BytesReference bytes = result.bytes();
-            if (logger.isDebugEnabled()) {
-                logger.debug("output: {}", bytes.utf8ToString());
-            }
-            return bytes;
-        }
-
-        @Override
-        public Object unwrap(final Object value) {
-            return value;
         }
     }
 
     public void setThreadContext(final ThreadContext threadContext) {
         this.threadContext = threadContext;
     }
+
 }

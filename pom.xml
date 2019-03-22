@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs</groupId>
 	<artifactId>elasticsearch-lang-velocity</artifactId>
-	<version>5.6.1-SNAPSHOT</version>
+	<version>6.6.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<description>This plugin adds Velocity language to Elasticsearch.</description>
 	<inceptionYear>2014</inceptionYear>
@@ -26,12 +26,13 @@
 		<version>9</version>
 	</parent>
 	<properties>
-		<elasticsearch.version>5.6.5</elasticsearch.version>
+		<elasticsearch.version>6.6.2</elasticsearch.version>
 		<elasticsearch.plugin.classname>org.codelibs.elasticsearch.velocity.VelocityPlugin</elasticsearch.plugin.classname>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
-		<lucene.version>6.6.1</lucene.version>
+		<lucene.version>7.6.0</lucene.version>
 		<velocity.version>1.7</velocity.version>
+		<log4j.version>2.11.1</log4j.version>
 	</properties>
 	<build>
 		<plugins>
@@ -94,6 +95,12 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-api</artifactId>
+			<version>${log4j.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.velocity</groupId>
 			<artifactId>velocity</artifactId>
 			<version>${velocity.version}</version>
@@ -113,13 +120,13 @@
 		<dependency>
 			<groupId>org.codelibs</groupId>
 			<artifactId>elasticsearch-sstmpl</artifactId>
-			<version>5.6.0</version>
+			<version>6.6.0-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.github.spullara.mustache.java</groupId>
 			<artifactId>compiler</artifactId>
-			<version>0.9.3</version>
+			<version>0.9.6</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
