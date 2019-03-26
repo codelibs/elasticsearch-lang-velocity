@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
-import org.codelibs.curl.Curl;
 import org.codelibs.curl.CurlResponse;
 import org.codelibs.elasticsearch.runner.ElasticsearchClusterRunner;
 import org.codelibs.elasticsearch.runner.net.EcrCurl;
@@ -40,6 +39,13 @@ public class VelocityPluginTest {
         esHomeDir = File.createTempFile("eshome", "");
         esHomeDir.delete();
 
+        final File scriptDir = new File(esHomeDir, "node_1/config/scripts");
+        scriptDir.mkdirs();
+        Files.write(new File(scriptDir, "lib_search_query_1.vm").toPath(),
+                "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}".getBytes());
+        Files.write(new File(scriptDir, "VM_global_library.vm").toPath(),
+                "#macro(macroSearchQuery){\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"}#end".getBytes());
+
         runner = new ElasticsearchClusterRunner();
         runner.onBuild(new ElasticsearchClusterRunner.Builder() {
             @Override
@@ -67,6 +73,17 @@ public class VelocityPluginTest {
         final String type = "data";
         runner.createIndex(index, Settings.builder().build());
 
+        String query;
+
+        query = "{\"script\":{\"lang\":\"velocity\",\"source\":"//
+                + "\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${my_size}\\\"}\""//
+                + "}}";
+        try (CurlResponse curlResponse =
+                EcrCurl.post(node, "/_scripts/index_search_query_1").header("Content-Type", "application/json").body(query).execute()) {
+            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+            assertThat(true, is(contentMap.get("acknowledged")));
+        }
+
         for (int i = 1; i <= 1000; i++) {
             final IndexResponse indexResponse = runner.insert(index, type, String.valueOf(i),
                     "{\"id\":\"" + i + "\",\"msg\":\"test " + i + "\",\"counter\":" + i + ",\"category\":" + i % 10 + "}");
@@ -75,7 +92,6 @@ public class VelocityPluginTest {
 
         for (int loop = 0; loop < 100; loop++) {
 
-            String query;
             query = "{\"query\":{\"match_all\":{}}}";
             try (CurlResponse curlResponse = EcrCurl.post(node, "/" + index + "/" + type + "/_search")
                     .header("Content-Type", "application/json").body(query).execute()) {
@@ -144,14 +160,7 @@ public class VelocityPluginTest {
         esHomeDir = File.createTempFile("eshome", "");
         esHomeDir.delete();
 
-        final File scriptDir = new File(esHomeDir, "config/node_1/scripts");
-        scriptDir.mkdirs();
-        Files.write(new File(scriptDir, "search_1.vm").toPath(),
-                "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${file1.my_size}\"}".getBytes());
-        Files.write(new File(scriptDir, "search_2.vm").toPath(),
-                "{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${file2.getAsList(\"my_size\")[2]}\"}".getBytes());
-
-        final File confDir = new File(esHomeDir, "config/node_1");
+        final File confDir = new File(esHomeDir, "node_1/config");
         confDir.mkdirs();
         new File(confDir, "props").mkdirs();
         Files.write(new File(confDir, "file1.properties").toPath(), "my_size=5".getBytes());
@@ -192,7 +201,25 @@ public class VelocityPluginTest {
 
         String query;
 
-        query = "{\"lang\":\"velocity\",\"file\":\"search_1\","
+        query = "{\"script\":{\"lang\":\"velocity\",\"source\":"//
+                + "\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${file1.my_size}\\\"}\""//
+                + "}}";
+        try (CurlResponse curlResponse =
+                EcrCurl.post(node, "/_scripts/search_1").header("Content-Type", "application/json").body(query).execute()) {
+            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+            assertThat(true, is(contentMap.get("acknowledged")));
+        }
+
+        query = "{\"script\":{\"lang\":\"velocity\",\"source\":"//
+                + "\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${file2.getAsList(\\\"my_size\\\")[2]}\\\"}\""//
+                + "}}";
+        try (CurlResponse curlResponse =
+                EcrCurl.post(node, "/_scripts/search_2").header("Content-Type", "application/json").body(query).execute()) {
+            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+            assertThat(true, is(contentMap.get("acknowledged")));
+        }
+
+        query = "{\"id\":\"search_1\","
                 + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
         try (CurlResponse curlResponse =
                 EcrCurl.post(node, "/_search/script_template").header("Content-Type", "application/json").body(query).execute()) {
@@ -202,7 +229,7 @@ public class VelocityPluginTest {
             assertThat(5, is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
         }
 
-        query = "{\"lang\":\"velocity\",\"file\":\"search_2\","
+        query = "{\"id\":\"search_2\","
                 + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
         try (CurlResponse curlResponse =
                 EcrCurl.post(node, "/_search/script_template").header("Content-Type", "application/json").body(query).execute()) {
@@ -217,7 +244,7 @@ public class VelocityPluginTest {
 
         Thread.sleep(5000L);
 
-        query = "{\"lang\":\"velocity\",\"file\":\"search_2\","
+        query = "{\"id\":\"search_2\","
                 + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
         try (CurlResponse curlResponse =
                 EcrCurl.post(node, "/_search/script_template").header("Content-Type", "application/json").body(query).execute()) {
@@ -237,17 +264,26 @@ public class VelocityPluginTest {
 
         final Node node = runner.node();
 
-        try (CurlResponse curlResponse = EcrCurl.post(node, "/_search/script_template/velocity/index_search_query_1")
-                .header("Content-Type", "application/json")
-                .body("{\"template\":\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${my_size}\\\"}\"}")
-                .execute()) {
-            assertThat(200, is(curlResponse.getHttpStatusCode()));
-        }
-
         String query;
+
+        query = "{\"script\":{\"lang\":\"velocity\",\"source\":"//
+                + "\"{\\\"query\\\":{\\\"match\\\":{\\\"${my_field}\\\":\\\"${my_value}\\\"}},\\\"size\\\":\\\"${my_size}\\\"}\""//
+                + "}}";
+        try (CurlResponse curlResponse =
+                EcrCurl.post(node, "/_scripts/search_1").header("Content-Type", "application/json").body(query).execute()) {
+            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+            assertThat(true, is(contentMap.get("acknowledged")));
+        }
 
         query = "{\"lang\":\"velocity\",\"inline\":\"{\\\"query\\\":{\\\"match\\\":{\\\"$my_field\\\":\\\"$my_value\\\"}},\\\"size\\\":\\\"$my_size\\\"}\","
                 + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+        try (CurlResponse curlResponse =
+                EcrCurl.post(node, "/_render/script_template").header("Content-Type", "application/json").body(query).execute()) {
+            final String content = curlResponse.getContentAsString();
+            assertEquals("{\"template_output\":{\"query\":{\"match\":{\"category\":\"1\"}},\"size\":\"50\"}}", content);
+        }
+
+        query = "{\"id\":\"search_1\"," + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
         try (CurlResponse curlResponse =
                 EcrCurl.post(node, "/_render/script_template").header("Content-Type", "application/json").body(query).execute()) {
             final String content = curlResponse.getContentAsString();

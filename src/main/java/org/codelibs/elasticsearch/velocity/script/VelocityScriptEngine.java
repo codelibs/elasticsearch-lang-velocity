@@ -1,4 +1,4 @@
-package org.codelibs.elasticsearch.velocity.service;
+package org.codelibs.elasticsearch.velocity.script;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -35,15 +35,14 @@ import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.script.ScriptContext;
 import org.elasticsearch.script.ScriptEngine;
 import org.elasticsearch.script.TemplateScript;
 
-public class VelocityScriptEngineService implements ScriptEngine {
+public class VelocityScriptEngine implements ScriptEngine {
 
-    private static Logger logger = LogManager.getLogger(VelocityScriptEngineService.class);
+    private static Logger logger = LogManager.getLogger(VelocityScriptEngine.class);
 
     public static final Setting<Settings> SETTING_SCRIPT_VELOCITY_PROPS =
             Setting.groupSetting("script.velocity.props.", Property.NodeScope);
@@ -61,9 +60,7 @@ public class VelocityScriptEngineService implements ScriptEngine {
 
     private final Map<String, Object> contextPropMap = new ConcurrentHashMap<>();
 
-    private ThreadContext threadContext;
-
-    public VelocityScriptEngineService(final Settings settings, Path configPath) {
+    public VelocityScriptEngine(final Settings settings, Path configPath) {
 
         workDir = findWorkDir(settings);
 
@@ -184,7 +181,6 @@ public class VelocityScriptEngineService implements ScriptEngine {
                 scriptVars = new HashMap<>();
             }
             scriptVars.putAll(params);
-            scriptVars.put("threadContext", threadContext);
             return new VelocityExecutableScript(scriptTemplate, scriptVars);
         };
         return context.factoryClazz.cast(compiled);
@@ -297,10 +293,6 @@ public class VelocityScriptEngineService implements ScriptEngine {
                 throw new ElasticsearchException("Could not execute query template: ", e);
             }
         }
-    }
-
-    public void setThreadContext(final ThreadContext threadContext) {
-        this.threadContext = threadContext;
     }
 
 }
