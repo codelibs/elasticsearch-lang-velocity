@@ -120,7 +120,7 @@
 		<dependency>
 			<groupId>org.codelibs</groupId>
 			<artifactId>elasticsearch-sstmpl</artifactId>
-			<version>6.6.0-SNAPSHOT</version>
+			<version>6.6.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
