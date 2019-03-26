@@ -121,6 +121,16 @@ public class VelocityPluginTest {
                 assertThat(50, is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
             }
 
+            query = "{\"lang\":\"velocity\",\"template\":{\"query\":{\"match\":{\"${my_field}\":\"${my_value}\"}},\"size\":\"${my_size}\"},"
+                    + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
+            try (CurlResponse curlResponse = EcrCurl.post(node, "/" + index + "/" + type + "/_search/script_template")
+                    .header("Content-Type", "application/json").body(query).execute()) {
+                final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+                final Map<String, Object> hitsMap = (Map<String, Object>) contentMap.get("hits");
+                assertThat(100, is(hitsMap.get("total")));
+                assertThat(50, is(((List<Map<String, Object>>) hitsMap.get("hits")).size()));
+            }
+
             query = "{\"lang\":\"velocity\",\"template\":\"#parse(\\\"lib_search_query_1.vm\\\")\","
                     + "\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"50\"}}";
             try (CurlResponse curlResponse = EcrCurl.post(node, "/" + index + "/" + type + "/_search/script_template")
