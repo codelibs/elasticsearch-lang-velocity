@@ -21,7 +21,7 @@ cd $TEST_DIR
 echo "Installing Elasticsearch..."
 rm -rf elasticsearch-$ES_VERSION > /dev/null
 unzip $ZIP_FILE
-./elasticsearch-$ES_VERSION/bin/elasticsearch-plugin install org.codelibs:elasticsearch-sstmpl:6.6.0 -b
+./elasticsearch-$ES_VERSION/bin/elasticsearch-plugin install org.codelibs:elasticsearch-sstmpl:6.7.0 -b
 ./elasticsearch-$ES_VERSION/bin/elasticsearch-plugin install file:`ls $BASE_DIR/target/releases/elasticsearch-*.zip` -b
 
 echo "Starting Elasticsearch..."
