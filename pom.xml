@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs</groupId>
 	<artifactId>elasticsearch-lang-velocity</artifactId>
-	<version>6.6.1-SNAPSHOT</version>
+	<version>6.7.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<description>This plugin adds Velocity language to Elasticsearch.</description>
 	<inceptionYear>2014</inceptionYear>
@@ -26,11 +26,11 @@
 		<version>9</version>
 	</parent>
 	<properties>
-		<elasticsearch.version>6.6.2</elasticsearch.version>
+		<elasticsearch.version>6.7.1</elasticsearch.version>
 		<elasticsearch.plugin.classname>org.codelibs.elasticsearch.velocity.VelocityPlugin</elasticsearch.plugin.classname>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
-		<lucene.version>7.6.0</lucene.version>
+		<lucene.version>7.7.0</lucene.version>
 		<velocity.version>1.7</velocity.version>
 		<log4j.version>2.11.1</log4j.version>
 	</properties>
