@@ -8,6 +8,7 @@ TEST_DIR=$BASE_DIR/target
 ES_VERSION=`grep '<elasticsearch.version>' $BASE_DIR/pom.xml | sed -e "s/.*>\(.*\)<.*/\1/"`
 ES_HOST=localhost
 ES_PORT=9200
+TMP_FILE=$TEST_DIR/tmp.$$
 
 ZIP_FILE=$HOME/.m2/repository/elasticsearch-$ES_VERSION.zip
 if [ ! -f $ZIP_FILE ] ; then
@@ -52,14 +53,26 @@ curl -s -H "Content-Type: application/json" -XPOST "$ES_HOST:$ES_PORT/_scripts/i
   -d "{\"script\":{\"lang\":\"velocity\",\"source\":\"{\\\"query\\\":{\\\"match\\\":{\\\"\${my_field}\\\":\\\"\${my_value}\\\"}},\\\"size\\\":\\\"\${my_size}\\\"}\"}}"
 
 echo "search by inline"
-curl -s -H "Content-Type: application/json" -XPOST "$ES_HOST:$ES_PORT/_search/script_template" \
-  -d "{\"lang\":\"velocity\",\"template\":{\"query\":{\"match\":{\"\${my_field}\":\"\${my_value}\"}},\"size\":\"\${my_size}\"},\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"5\"}}"\
-  | jq '.'
+curl -s -o $TMP_FILE -H "Content-Type: application/json" -XPOST "$ES_HOST:$ES_PORT/_search/script_template" \
+  -d "{\"lang\":\"velocity\",\"template\":{\"query\":{\"match\":{\"\${my_field}\":\"\${my_value}\"}},\"size\":\"\${my_size}\"},\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"5\"}}"
+cat $TMP_FILE | jq '.'
+RET=`cat $TMP_FILE | jq '.hits.total'`
+if [ "x$RET" != "x100" ] ; then
+  echo "[ERROR] hits.total is not 100."
+  kill $ES_PID
+  exit 1
+fi
 
 echo "search by stored template"
-curl -s -H "Content-Type: application/json" -XPOST "$ES_HOST:$ES_PORT/_search/script_template" \
-  -d "{\"lang\":\"velocity\",\"id\":\"index_search_query\",\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"5\"}}"\
-  | jq '.'
+curl -s -o $TMP_FILE -H "Content-Type: application/json" -XPOST "$ES_HOST:$ES_PORT/_search/script_template" \
+  -d "{\"lang\":\"velocity\",\"id\":\"index_search_query\",\"params\":{\"my_field\":\"category\",\"my_value\":\"1\",\"my_size\":\"5\"}}"
+cat $TMP_FILE | jq '.'
+RET=`cat $TMP_FILE | jq '.hits.total'`
+if [ "x$RET" != "x100" ] ; then
+  echo "[ERROR] hits.total is not 100."
+  kill $ES_PID
+  exit 1
+fi
 
 echo "=== Finish Testing ==="
 
