@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -295,4 +296,8 @@ public class VelocityScriptEngine implements ScriptEngine {
         }
     }
 
+    @Override
+    public Set<ScriptContext<?>> getSupportedContexts() {
+        return Collections.singleton(TemplateScript.CONTEXT);
+    }
 }

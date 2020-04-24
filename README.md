@@ -12,27 +12,11 @@ This plugin add Velocity language to Elasticsearch.
 ### Issues/Questions
 
 Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/issues "issue").
-(Japanese forum is [here](https://github.com/codelibs/codelibs-ja-forum "here").)
 
 ## Installation
 
-### For 5.x
 
-    $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-lang-velocity:5.5.0
-
-### For 2.x
-
-    $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-lang-velocity/2.4.0
-
-### Enable Dynamic Scripting
-
-To use this plugin, enable dynamic scripting.
-For more information, see [enabling dynamic scripting](https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-scripting.html#enable-dynamic-scripting "enabling dynamic scripting").
-
-    script.inline: true
-    script.stored: true
-    script.file: true
-    script.search: true
+    $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-lang-velocity:7.6.0
 
 
 ## References
@@ -46,18 +30,7 @@ Using [Script-based Search Template](https://github.com/codelibs/elasticsearch-s
     GET /_search/script_template
     {
         "lang": "velocity",
-        "template": "{\"query\": {\"match\": {\"title\": \"${query_string}\"}}}",
-        "params": {
-            "query_string": "search for these words"
-        }
-    }
-
-If you use a template file, please put template\_name.vm into ${es.confing}/scripts and send the following query:
-
-    GET /_search/script_template
-    {
-        "lang": "velocity",
-        "file":"template_name",
+        "inline": "{\"query\": {\"match\": {\"title\": \"${query_string}\"}}}",
         "params": {
             "query_string": "search for these words"
         }
