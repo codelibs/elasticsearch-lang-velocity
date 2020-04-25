@@ -7,7 +7,7 @@ This plugin add Velocity language to Elasticsearch.
 
 ## Version
 
-[Versions in Maven Repository](http://central.maven.org/maven2/org/codelibs/elasticsearch-lang-velocity/)
+[Versions in Maven Repository](https://repo1.maven.org/maven2/org/codelibs/elasticsearch-lang-velocity/)
 
 ### Issues/Questions
 
@@ -15,9 +15,7 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-lang-velocity/i
 
 ## Installation
 
-
     $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-lang-velocity:7.6.0
-
 
 ## References
 
