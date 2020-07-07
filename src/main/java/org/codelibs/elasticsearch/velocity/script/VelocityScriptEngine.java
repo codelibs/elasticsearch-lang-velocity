@@ -295,9 +295,4 @@ public class VelocityScriptEngine implements ScriptEngine {
             }
         }
     }
-
-    @Override
-    public Set<ScriptContext<?>> getSupportedContexts() {
-        return Collections.singleton(TemplateScript.CONTEXT);
-    }
 }
