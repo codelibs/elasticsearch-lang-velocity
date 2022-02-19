@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs</groupId>
 	<artifactId>elasticsearch-lang-velocity</artifactId>
-	<version>7.6.1-SNAPSHOT</version>
+	<version>7.16.3-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<description>This plugin adds Velocity language to Elasticsearch.</description>
 	<inceptionYear>2014</inceptionYear>
@@ -26,13 +26,13 @@
 		<version>9</version>
 	</parent>
 	<properties>
-		<elasticsearch.version>7.6.2</elasticsearch.version>
+		<elasticsearch.version>7.16.3</elasticsearch.version>
 		<elasticsearch.plugin.classname>org.codelibs.elasticsearch.velocity.VelocityPlugin</elasticsearch.plugin.classname>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<lucene.version>8.4.0</lucene.version>
 		<velocity.version>1.7</velocity.version>
-		<log4j.version>2.11.1</log4j.version>
+		<log4j.version>2.17.1</log4j.version>
 	</properties>
 	<build>
 		<plugins>
@@ -97,6 +97,23 @@
 			</plugin>
 		</plugins>
 	</build>
+	<repositories>
+		<repository>
+			<id>central</id>
+			<url>https://repo1.maven.org/maven2/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>codelibs.org</id>
+			<name>CodeLibs Repository</name>
+			<url>https://maven.codelibs.org</url>
+		</repository>
+	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>org.elasticsearch</groupId>
@@ -130,7 +147,7 @@
 		<dependency>
 			<groupId>org.codelibs</groupId>
 			<artifactId>elasticsearch-sstmpl</artifactId>
-			<version>7.6.0</version>
+			<version>7.16.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
