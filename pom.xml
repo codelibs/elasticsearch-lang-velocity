@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs</groupId>
 	<artifactId>elasticsearch-lang-velocity</artifactId>
-	<version>7.16.3-SNAPSHOT</version>
+	<version>7.16.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<description>This plugin adds Velocity language to Elasticsearch.</description>
 	<inceptionYear>2014</inceptionYear>
